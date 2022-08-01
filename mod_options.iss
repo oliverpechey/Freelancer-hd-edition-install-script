@@ -86,7 +86,7 @@ begin
     end;
 end;
 
-procedure Process_SinglePlayerMode();
+procedure EnableOpenSP(FileName: string);
 var
   NewPlayerPath: string;
   Mission13Path: string;
@@ -94,26 +94,22 @@ begin
   NewPlayerPath := ExpandConstant('{app}\EXE\newplayer.fl')
   Mission13Path := ExpandConstant('{app}\DATA\MISSIONS\M13\')
 
-  if OspNormal.Checked then
-    begin
-    FileReplaceString(NewPlayerPath, 'Mission = Mission_01a', 'Mission = Mission_13')
+  // Ensure the mission 13 script is used when starting a new game
+  FileReplaceString(NewPlayerPath, 'Mission = Mission_01a', 'Mission = Mission_13')
 
-    // Rename vanilla mission 13 file
-    RenameFile(Mission13Path + 'm13.ini', Mission13Path + 'm13_vanilla.ini')
-    
-    // Rename new open sp normal file
-    RenameFile(Mission13Path + 'm13_opensp_normal.ini', Mission13Path + 'm13.ini')
-    end
-  else if OspPirate.Checked then
-    begin
-    FileReplaceString(NewPlayerPath, 'Mission = Mission_01a', 'Mission = Mission_13')
+  // Rename vanilla mission 13 file
+  RenameFile(Mission13Path + 'm13.ini', Mission13Path + 'm13_vanilla.ini')
 
-    // Rename vanilla mission 13 file
-    RenameFile(Mission13Path + 'm13.ini', Mission13Path + 'm13_vanilla.ini')
-    
-    // Rename new open sp pirate file
-    RenameFile(Mission13Path + 'm13_opensp_pirate.ini', Mission13Path + 'm13.ini')
-    end;
+  // Rename new open sp file
+  RenameFile(Mission13Path + 'm13_opensp_' + FileName + '.ini', Mission13Path + 'm13.ini')
+end;
+
+procedure Process_SinglePlayerMode();
+begin
+  if StoryMode.ItemIndex = 1 then // OSP Normal selected
+    EnableOpenSP('normal')
+  else if StoryMode.ItemIndex = 2 then // OSP Pirate selected
+    EnableOpenSP('pirate');
 end;
 
 procedure Process_NewSaveFolder();
@@ -126,6 +122,23 @@ begin
     begin
     FileReplaceString(FlPlusPlusPath, 'save_folder_name = Freelancer', 'save_folder_name = FreelancerHD')
     end;
+end;
+
+procedure Process_LevelRequirements();
+var
+  ExePath: string;
+begin
+  if not LevelRequirements.Checked then
+    exit;
+
+  ExePath := ExpandConstant('{app}\EXE\')
+
+  WriteHexToFile(ExePath + 'Freelancer.exe', $080499, 'EB'); // Allows the purchase of equipment below the required level
+  WriteHexToFile(ExePath + 'Freelancer.exe', $082E95, 'EB'); // Changes the display of equipment below the required level
+  WriteHexToFile(ExePath + 'Freelancer.exe', $0B948D, 'EB'); // Allows the purchase of ships below the required level
+  
+  // Disable the MP Rep plugin because it's incompatible with the above patches
+  FileReplaceString(ExePath + 'dacom.ini', 'MPRep.dll', ';MPRep.dll')
 end;
 
 // Processes the Startup Logo option. Renames files depending on what option is selected
@@ -141,7 +154,7 @@ begin
   if(not StartupRes.Values[2]) then begin
     // Rename old file away
     RenameFile(NewFile,FolderPath + 'startupscreen_1280_vanilla.tga');
-    // Rename the correct startup res depending on option
+    // Rename the correct startup res depending on the selected option
     if(StartupRes.Values[1]) then // 720p 16:9
       OldFile := FolderPath + 'startupscreen_1280_1280x720.tga'
     else if(StartupRes.Values[3]) then // 1080p 4:3
@@ -203,7 +216,7 @@ procedure Process_SmallText();
 begin
     FilePath := ExpandConstant('{app}\DATA\FONTS\fonts.ini');
 
-    if SmallText.Values[1] then // Fix for 2560x1440 screens
+    if (SmallText.Values[1]) or (SmallText.Values[2]) then // Fix for both 2560x1440 and 3840x2160 screens
       FileReplaceString(FilePath,
       'nickname = NavMap1600' + #13#10 +
       'font = Agency FB' + #13#10 +
@@ -230,15 +243,26 @@ begin
         'nickname = Normal' + #13#10 +
         'font = Agency FB' + #13#10 +
         'fixed_height = 0.029');
-      FileReplaceString(FilePath,
-        'nickname = NavMap1600' + #13#10 +
-        'font = Agency FB' + #13#10 +
-        'fixed_height = 0.015',
-
-        'nickname = NavMap1600' + #13#10 +
-        'font = Agency FB' + #13#10 +
-        'fixed_height = 0.025');
     end;
+end;
+
+procedure Process_RussianFonts();
+  var
+    FontsPath : string;
+    _ : Integer;
+begin
+    if not RussianFonts.Checked then
+      exit;
+
+    FontsPath := ExpandConstant('{app}\DATA\FONTS\');
+
+    // Replace all 14 occurrences of Agency FB with Agency FB Cyrillic in fonts.ini
+    for _ := 1 to 14 do
+      FileReplaceString(FontsPath + 'fonts.ini', 'Agency FB' + #13#10, 'Agency FB Cyrillic' + #13#10);
+
+    // Replace all 6 occurrences of Agency FB with Agency FB Cyrillic in rich_fonts.ini
+    for _ := 1 to 6 do
+      FileReplaceString(FontsPath + 'rich_fonts.ini', 'Agency FB,', 'Agency FB Cyrillic,');
 end;
 
 // SinglePlayer console processing logic
@@ -247,26 +271,38 @@ begin
   if SinglePlayer.Checked then FileReplaceString(ExpandConstant('{app}\EXE\dacom.ini'),';console.dll','console.dll')
 end;
 
-// Best options processing logic
-procedure Process_BestOptions();
+// Gets the path of a file in the My Games\Freelancer(HD) directory
+function GetOptionsPath(FileName: string): string;
 var
-  MyGamesFolder: string;
   OptionsFolder: string;
-  OptionsPath: string;
-  NewOptionsPath: string;
+  MyGamesFolder: string;
 begin
-  if not BestOptions.Checked then
-    exit;
+  MyGamesFolder := ExpandConstant('{userdocs}\My Games\')
 
   if NewSaveFolder.Checked then
     OptionsFolder := 'FreelancerHD'
   else
     OptionsFolder := 'Freelancer';
 
-  MyGamesFolder := ExpandConstant('{userdocs}\My Games\')
-  OptionsPath := MyGamesFolder + OptionsFolder + '\PerfOptions.ini'
+  CreateDirIfNotExists(MyGamesFolder);
+  CreateDirIfNotExists(MyGamesFolder + OptionsFolder);
+
+  Result := MyGamesFolder + OptionsFolder + '\' + FileName + '.ini'
+end;
+
+// Best options processing logic
+procedure Process_BestOptions();
+var
+  OptionsPath: string;
+  NewOptionsPath: string;
+begin
+  if not BestOptions.Checked then
+    exit;
+
+  OptionsPath := GetOptionsPath('PerfOptions')
   NewOptionsPath := ExpandConstant('{app}\PerfOptions.ini')
 
+  // If the options file exists, apply all the best known options in that file. If it doesn't exist, copy a pre-existing file with the best options already applied.
   if FileExists(OptionsPath) then begin
     FileReplaceString(OptionsPath, 'SkipMachineWarnings=',       'SkipMachineWarnings=TRUE;')
     FileReplaceString(OptionsPath, 'DitherControl =',            'DitherControl = 1.00;')
@@ -292,17 +328,11 @@ begin
     FileReplaceString(OptionsPath, 'color_bpp=',                 'color_bpp= 32;')
     FileReplaceString(OptionsPath, 'depth_bpp=',                 'depth_bpp= 32;')
   end
-  else begin
-    CreateDirIfNotExists(MyGamesFolder);
-    CreateDirIfNotExists(MyGamesFolder + OptionsFolder);
-
+  else
     FileCopy(NewOptionsPath, OptionsPath, false);
-  end;
 
+  // Set the user's desktop resolution as the display size in the options file
   FileReplaceString(OptionsPath, 'size=', 'size= ' + IntToStr(DesktopRes.Width) + ', ' + IntToStr(DesktopRes.Height) + ';')
-  
-  if not IsWine then
-    RemoveBOM(OptionsPath);
 end;
 
 // Effects processing logic
@@ -350,6 +380,7 @@ if MissileEffects.Checked then
     RenameFile(MissilePath + 'rh_missile02_new.ale',MissilePath + 'rh_missile02.ale')
   end;
 
+  // Rename chosen reflection file
   if ShinyReflections.Checked then begin
     RenameFile(ExpandConstant('{app}\DATA\FX\envmapbasic.mat'),ExpandConstant('{app}\DATA\FX\envmapbasic_vanilla.mat'))
     RenameFile(ExpandConstant('{app}\DATA\FX\envmapbasic_shiny.mat'),ExpandConstant('{app}\DATA\FX\envmapbasic.mat'))
@@ -359,6 +390,7 @@ if MissileEffects.Checked then
     RenameFile(ExpandConstant('{app}\DATA\FX\envmapbasic_shinier.mat'),ExpandConstant('{app}\DATA\FX\envmapbasic.mat'))
   end;
   
+  // Add player engine trails
   if EngineTrails.Checked then begin
     RenameFile(ExpandConstant('{app}\DATA\EQUIPMENT\engine_equip.ini'),ExpandConstant('{app}\DATA\EQUIPMENT\engine_equip_vanilla.ini'))
     RenameFile(ExpandConstant('{app}\DATA\EQUIPMENT\engine_equip_player_trails.ini'),ExpandConstant('{app}\DATA\EQUIPMENT\engine_equip.ini'))
@@ -418,6 +450,7 @@ var
 begin
   FilePath := ExpandConstant('{app}\EXE\flplusplus.ini');
 
+  // Set draw distances
   if(PageDrawDistances.Values[0]) then // 1x (Vanilla)
     FileReplaceString(FilePath, 'lod_scale = 9', 'lod_scale = 0')
   else if(PageDrawDistances.Values[1]) then // 2x 
@@ -454,55 +487,73 @@ end;
 procedure Process_HUD();
 var
   HudShiftPath: string;
+  KeyMapPath: string;
+  NewKeyMapPath: string;
 begin
-  if WidescreenHud.Checked then
-  begin
-      HudShiftPath := ExpandConstant('{app}\DATA\INTERFACE\HudShift.ini')
+  if not WidescreenHud.Checked then
+    exit;
 
-      // Enable plugins
-      FileReplaceString(
-        ExpandConstant('{app}\EXE\dacom.ini')
-        ,
-        ';HudFacility.dll' + #13#10 +
-        ';HudWeaponGroups.dll' + #13#10 +
-        ';HudTarget.dll' + #13#10 +
-        ';HudStatus.dll'
-        ,
-        'HudFacility.dll' + #13#10 +
-        ';HudWeaponGroups.dll' + #13#10 +
-        'HudTarget.dll' + #13#10 +
-        'HudStatus.dll'
-      )
+  HudShiftPath := ExpandConstant('{app}\DATA\INTERFACE\HudShift.ini')
+  KeyMapPath := GetOptionsPath('UserKeyMap')
+  NewKeyMapPath := ExpandConstant('{app}\UserKeyMap.ini')
 
-      // Adjust target and player info positions
-      FileReplaceString(
-        HudShiftPath
-        ,
-        'position = 4e0a80, -0.3630, 4e0a94, -0.3025		; wireframe' + #13#10 +
-        'position = 4e0fe7, -0.4105, 4e0fef, -0.3700		; TargetMinimizedFrame' + #13#10 +
-        'position = 4e10ff, -0.4820, 4e1107, -0.2000		; TargetShipName' + #13#10 +
-        'position = 4e1145, -0.4820, 4e1158, -0.2000' + #13#10 +
-        'position = 4e1180, -0.4820, 4e1188, -0.2180		; SubtargetName' + #13#10 +
-        'position = 4e11e2, -0.4820, 4e11f0, -0.2180' + #13#10 +
-        'position = 4e1247, -0.2650, 4e124f, -0.2695		; TargetPreviousButton' + #13#10 +
-        'position = 4e12b4, -0.2650, 4e12bc, -0.3005		; TargetNextButton' + #13#10 +
-        'position = 4e175c, -0.4940, 4e1764, -0.3610		; TargetRankText'
-        ,
-        'position = 4e0a80, -0.1245, 4e0a94, -0.2935		; wireframe' + #13#10 +
-        'position = 4e0fe7, -0.4105, 4e0fef, -0.3700		; TargetMinimizedFrame' + #13#10 +
-        'position = 4e10ff, -0.2430, 4e1107, -0.2030		; TargetShipName' + #13#10 +
-        'position = 4e1145, -0.2430, 4e1158, -0.2030' + #13#10 +
-        'position = 4e1180, -0.2430, 4e1188, -0.2210		; SubtargetName' + #13#10 +
-        'position = 4e11e2, -0.2430, 4e11f0, -0.2210' + #13#10 +
-        'position = 4e1247, -0.0595, 4e124f, -0.2780		; TargetPreviousButton' + #13#10 +
-        'position = 4e12b4, -0.0595, 4e12bc, -0.3090		; TargetNextButton' + #13#10 +
-        'position = 4e175c, -0.2550, 4e1764, -0.3610		; TargetRankText'
-      )
+  // Enable plugins
+  FileReplaceString(
+    ExpandConstant('{app}\EXE\dacom.ini')
+    ,
+    ';HudFacility.dll' + #13#10 +
+    ';HudWeaponGroups.dll' + #13#10 +
+    ';HudTarget.dll' + #13#10 +
+    ';HudStatus.dll'
+    ,
+    'HudFacility.dll' + #13#10 +
+    ';HudWeaponGroups.dll' + #13#10 +
+    'HudTarget.dll' + #13#10 +
+    'HudStatus.dll'
+  )
 
-    // Adjust request trade button and player wireframe positions
-    FileReplaceString(HudShiftPath,'position = 4da2fa,  0.4180, 4da30e, -0.2900','position = 4da2fa,  0.1765, 4da30e, -0.3025')
-    FileReplaceString(HudShiftPath,'position = 4e14db, -0.2020, 4e14e3, -0.3700		; TargetTradeButton','position = 4e14db, -0.0180, 4e14e3, -0.3700		; TargetTradeButton')
+  // Adjust target and player info positions
+  FileReplaceString(
+    HudShiftPath
+    ,
+    'position = 4e0a80, -0.3630, 4e0a94, -0.3025		; wireframe' + #13#10 +
+    'position = 4e0fe7, -0.4105, 4e0fef, -0.3700		; TargetMinimizedFrame' + #13#10 +
+    'position = 4e10ff, -0.4820, 4e1107, -0.2000		; TargetShipName' + #13#10 +
+    'position = 4e1145, -0.4820, 4e1158, -0.2000' + #13#10 +
+    'position = 4e1180, -0.4820, 4e1188, -0.2180		; SubtargetName' + #13#10 +
+    'position = 4e11e2, -0.4820, 4e11f0, -0.2180' + #13#10 +
+    'position = 4e1247, -0.2650, 4e124f, -0.2695		; TargetPreviousButton' + #13#10 +
+    'position = 4e12b4, -0.2650, 4e12bc, -0.3005		; TargetNextButton' + #13#10 +
+    'position = 4e175c, -0.4940, 4e1764, -0.3610		; TargetRankText'
+    ,
+    'position = 4e0a80, -0.1245, 4e0a94, -0.2935		; wireframe' + #13#10 +
+    'position = 4e0fe7, -0.4105, 4e0fef, -0.3700		; TargetMinimizedFrame' + #13#10 +
+    'position = 4e10ff, -0.2430, 4e1107, -0.2030		; TargetShipName' + #13#10 +
+    'position = 4e1145, -0.2430, 4e1158, -0.2030' + #13#10 +
+    'position = 4e1180, -0.2430, 4e1188, -0.2210		; SubtargetName' + #13#10 +
+    'position = 4e11e2, -0.2430, 4e11f0, -0.2210' + #13#10 +
+    'position = 4e1247, -0.0595, 4e124f, -0.2780		; TargetPreviousButton' + #13#10 +
+    'position = 4e12b4, -0.0595, 4e12bc, -0.3090		; TargetNextButton' + #13#10 +
+    'position = 4e175c, -0.2550, 4e1764, -0.3610		; TargetRankText'
+  )
+
+  // Adjust request trade button and player wireframe positions
+  FileReplaceString(HudShiftPath,'position = 4da2fa,  0.4180, 4da30e, -0.2900','position = 4da2fa,  0.1765, 4da30e, -0.3025')
+  FileReplaceString(HudShiftPath,'position = 4e14db, -0.2020, 4e14e3, -0.3700		; TargetTradeButton','position = 4e14db, -0.0180, 4e14e3, -0.3700		; TargetTradeButton')
+
+  // If a key map file already exists, remove the "Target View" (Alt + T) bind. If the key map file doesn't exist yet, copy a pre-existing key map file where this hotkey has already been removed.
+  if FileExists(KeyMapPath) then begin
+    FileReplaceString(KeyMapPath, 
+      '[KeyCmd]' + #13#10
+      'nickname = USER_SWITCH_TO_TARGET' + #13#10
+      'key',
+
+      ';[KeyCmd]' + #13#10
+      ';nickname = USER_SWITCH_TO_TARGET' + #13#10
+      ';key')
   end
+  else
+    FileCopy(NewKeyMapPath, KeyMapPath, false);
 end;
 
 procedure Process_DarkHud();
@@ -819,6 +870,7 @@ var
 begin
   FilePath := ExpandConstant('{app}\EXE\freelancer.ini');
 
+  // Skip intros if selected
   if(SkipIntros.Checked) then 
     begin 
       FileReplaceString(FilePath, 'movie_file = movies\MGS_Logo_Final.wmv' + #13#10
@@ -841,6 +893,7 @@ begin
 
       FileReplaceString(HudShiftPath,';HudWeaponGroups = true','HudWeaponGroups = true')
 
+      // Enable weapon groups
       FileReplaceString(
         ExpandConstant('{app}\EXE\dacom.ini'),
         ';HudWeaponGroups.dll' + #13#10,
@@ -891,11 +944,6 @@ begin
   DgVoodooPath := ExpandConstant('{app}\EXE\dgVoodoo.conf');
   RefreshRateInt := StrToInt(DgVoodooRefreshRate.Text)
 
-  if RefreshRateInt <= 255 then
-    RefreshRateBinary := IntToHex(RefreshRateInt, 2)
-  else
-    RefreshRateBinary := SwapBytes(IntToHex(RefreshRateInt, 4));
-
   if DgVoodooAa.ItemIndex = 1 then
     // Enable AA 2x
     WriteHexToFile(DgVoodooPath, $6A, '02');
@@ -919,6 +967,13 @@ begin
     // Enable AF 16x
     WriteHexToFile(DgVoodooPath, $86, '10');
 
+  // Get the correct refresh rate as 2 or 4 byte hexadecimals
+  if RefreshRateInt <= 255 then
+    RefreshRateBinary := IntToHex(RefreshRateInt, 2)
+  else
+    RefreshRateBinary := SwapBytes(IntToHex(RefreshRateInt, 4));
+
+  // Set refresh rate
   WriteHexToFile(DgVoodooPath, $6E, RefreshRateBinary);
 end;
 
@@ -928,6 +983,8 @@ var
   Techniques: string;
 begin
   ReShadePath := ExpandConstant('{app}\EXE\');
+
+  // Activate ReShade by renaming the file
   RenameFile(ReShadePath + ReShadeDllName + '_reshade.dll', ReShadePath + ReShadeDllName + '.dll')
 
   // Enable checked ReShade options
@@ -941,29 +998,33 @@ begin
     // Use Tonemap only if windowed or fullscreen windowed have been checked
     Techniques := Techniques + 'Tonemap@Tonemap.fx';
 
+  // Removes a trailing comma at the end of the techniques if it's there
   if (LENGTH(Techniques) > 0) and (Techniques[LENGTH(Techniques)] = ',') then
     SetLength(Techniques, LENGTH(Techniques) - 1);
 
+  // Set the techniques
   FileReplaceString(ReShadePath + 'ReShadePreset.ini', 'Techniques=', 'Techniques=' + Techniques);
 end;
 
 procedure Process_DxWrapperReShade();
 begin
   if (DxWrapperGraphicsApi.Checked) and (DxWrapperReShade.Checked) then
-    ApplyReShadeOptions('d3d9', DxWrapperBloom.Checked, DxWrapperHdr.Checked, DxWrapperSaturation.Checked);
+    ApplyReShadeOptions('d3d9', DxWrapperBloom.Checked, DxWrapperHdr.Checked, DxWrapperSaturation.Checked); // d3d9 is for DirectX 9 (DxWrapper)
 end;
 
 procedure Process_DgVoodooReShade();
 begin
   if (DgVoodooGraphicsApi.Checked) and (DgVoodooReShade.Checked) then
-    ApplyReShadeOptions('dxgi', DgVoodooBloom.Checked, DgVoodooHdr.Checked, DgVoodooSaturation.Checked);
+    ApplyReShadeOptions('dxgi', DgVoodooBloom.Checked, DgVoodooHdr.Checked, DgVoodooSaturation.Checked); // dxgi is for DirectX 11 (dgVoodoo)
 end;
 
 procedure Process_DisplayMode();
 var
+  ExeFolderPath: string;
   ExePath: string;
 begin
-  ExePath := ExpandConstant('{app}\EXE\Freelancer.exe');
+  ExeFolderPath := ExpandConstant('{app}\EXE\');
+  ExePath := ExeFolderPath + 'Freelancer.exe';
 
   if (DisplayMode.ItemIndex = 1) or (DisplayMode.ItemIndex = 2) then // Windowed or borderless windowed selected
     WriteHexToFile(ExePath, $1B16CC, '00'); // Windowed mode
@@ -980,5 +1041,11 @@ begin
       WriteHexToFile(ExePath, $1B2665, 'EB') // Keep Freelancer running in the background when Alt-Tabbed
     else
       WriteHexToFile(ExePath, $1B264C, 'BA0100000090'); // Keep Freelancer and its window running in the background when Alt-Tabbed
+    
+    if MusicInBackground then
+      begin
+        WriteHexToFile(ExeFolderPath + 'soundmanager.dll', $0A021, '80'); // Continue playing the game's audio when Alt-Tabbed #1
+        WriteHexToFile(ExeFolderPath + 'soundstreamer.dll', $018A9, '80'); // Continue playing the game's audio when Alt-Tabbed #2
+      end;
   end;
 end;

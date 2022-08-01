@@ -1,6 +1,6 @@
 ; Inno Install Script for Freelancer: HD Edition
-; GitHub: https://github.com/ollieraikkonen/Freelancer-hd-edition-install-script
-; Main GitHub: https://github.com/bc46/Freelancer-hd-edition
+; GitHub: https://github.com/oliverpechey/Freelancer-hd-edition-install-script
+; Main GitHub: https://github.com/BC46/Freelancer-hd-edition
 
 #define MyAppVersion "0.6"
 #define MyAppName "Freelancer: HD Edition v" + MyAppVersion
@@ -11,13 +11,12 @@
 #define MyZipName "freelancerhd"
 ; This variable controls whether the zip is shipped with the exe or downloaded from a mirror
 #define AllInOneInstall true
-; TODO: Remember to change the mirror locations for each release
-#dim Mirrors[1] {"https://github.com/BC46/freelancer-hd-edition/archive/refs/tags/" + MyAppVersion + ".zip"}
+#dim Mirrors[2] {"https://github.com/BC46/freelancer-hd-edition/archive/refs/tags/" + MyAppVersion + ".zip", "https://archive.org/download/freelancer-hd-edition-" + MyAppVersion + "/freelancer-hd-edition-" + MyAppVersion + ".7z"}
 ; TODO: Update sizes for each release
 #define SizeZip 2438619136
 #define SizeExtracted 4195188736
 #define SizeVanilla 985624576
-#define SizeBuffer 50000
+#define SizeBuffer 100000
 #define SizeAll SizeZip + SizeExtracted + SizeVanilla + SizeBuffer
 
 [Setup]
@@ -60,8 +59,10 @@ Name: "{commondesktop}\Freelancer HD Edition"; Filename: "{app}\EXE\{#MyAppExeNa
 [Files]
 Source: "Assets\Text\installinfo.txt"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall
 Source: "Assets\Text\PerfOptions.ini"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall
+Source: "Assets\Text\UserKeyMap.ini"; DestDir: "{app}"; Flags: ignoreversion deleteafterinstall
 Source: "Assets\Fonts\AGENCYB.TTF"; DestDir: "{autofonts}"; FontInstall: "Agency FB Bold"; Flags: onlyifdoesntexist uninsneveruninstall
 Source: "Assets\Fonts\AGENCYR.TTF"; DestDir: "{autofonts}"; FontInstall: "Agency FB"; Flags: onlyifdoesntexist uninsneveruninstall
+Source: "Assets\Fonts\AGENCYR_CR.TTF"; DestDir: "{autofonts}"; FontInstall: "Agency FB Cyrillic"; Flags: onlyifdoesntexist uninsneveruninstall
 Source: "Assets\Fonts\ARIALUNI.TTF"; DestDir: "{autofonts}"; FontInstall: "Arial Unicode MS"; Flags: onlyifdoesntexist uninsneveruninstall
 Source: "Assets\External\7za.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall;
 Source: "Assets\External\utf-8-bom-remover.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall;
@@ -101,13 +102,13 @@ var
 // Checks which step we are on when it changed. If its the postinstall step then start the actual installing
 procedure CurStepChanged(CurStep: TSetupStep);
 var
-  ResultCode: Integer;
+  ResultCode, i: Integer;
 begin
     if CurStep = ssPostInstall then
     begin
         # if !AllInOneInstall
           if (OfflineInstall <> 'false') then
-            FileCopy(OfflineInstall,ExpandConstant('{tmp}\freelancerhd.7z'),false);
+            FileCopy(OfflineInstall,ExpandConstant('{tmp}\' + MyZipName + '.7z'),false);
         # endif
 
         // Copy Vanilla game to directory
@@ -117,7 +118,7 @@ begin
         UpdateProgress(30);
 
         // Unzip
-        WizardForm.StatusLabel.Caption := ExpandConstant('Unzipping {#MyAppName}');
+        WizardForm.StatusLabel.Caption := ExpandConstant('Unpacking {#MyAppName}');
         Exec(ExpandConstant('{tmp}\7za.exe'), ExpandConstant(' x -y -aoa "{tmp}\{#MyZipName}.7z"  -o"{app}"'), '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
         // -aoa Overwrite All existing files without prompt
         // -o Set output directory
@@ -125,7 +126,7 @@ begin
         UpdateProgress(60);
 
         // Copy mod files
-        WizardForm.StatusLabel.Caption := ExpandConstant('Moving {#MyAppName}');
+        WizardForm.StatusLabel.Caption := ExpandConstant('Relocating {#MyAppName}');
 
         DirectoryCopy(ExpandConstant('{app}\{#MyFolderName}'),ExpandConstant('{app}'),True);
 
@@ -138,9 +139,11 @@ begin
         Process_EnglishImprovements();
         Process_SinglePlayerMode();
         Process_NewSaveFolder();
+        Process_LevelRequirements();
         Process_StartUpLogo();
         Process_FreelancerLogo();
-        Process_SmallText();
+        Process_SmallText(); // Must be called before Process_RussianFonts();
+        Process_RussianFonts(); // Must be called after Process_SmallText();
         Process_Console();
         Process_BestOptions();
         Process_Effects();
@@ -149,9 +152,9 @@ begin
         Process_DrawDistances();
         Process_Planetscape();
         Process_Win10();
-        Process_HUD();
+        Process_HUD(); // Must be called before Process_FlatIcons(); and before Process_WeaponGroups();
         Process_DarkHUD();
-        Process_FlatIcons();
+        Process_FlatIcons(); // Must be called after Process_HUD();
         Process_WeaponGroups(); // Must be called after Process_HUD();
         Process_DxWrapper();
         Process_DxWrapperReShade();
@@ -162,19 +165,11 @@ begin
         WizardForm.StatusLabel.Caption := 'Cleaning up';
         UpdateProgress(95);
 
-        // Perform operations that (potentially) do not work on Wine
         if not IsWine then
         begin
-          // Delete potential UTF-8 BOM headers in all edited ini files
-          RemoveBOM(ExpandConstant('{app}\EXE\dacom.ini'));
-          RemoveBOM(ExpandConstant('{app}\EXE\freelancer.ini'));
-          RemoveBOM(ExpandConstant('{app}\EXE\flplusplus.ini'));
-          RemoveBOM(ExpandConstant('{app}\DATA\FONTS\fonts.ini'));
-          RemoveBOM(ExpandConstant('{app}\DATA\INTERFACE\HudShift.ini'));
-          RemoveBOM(ExpandConstant('{app}\DATA\FX\jumpeffect.ini'));
-          RemoveBOM(ExpandConstant('{app}\EXE\newplayer.fl'));
-          RemoveBOM(ExpandConstant('{app}\EXE\dxwrapper.ini'));
-          RemoveBOM(ExpandConstant('{app}\EXE\ReShadePreset.ini'));
+          // Delete potential UTF-8 BOM headers in all edited config files. May not work properly on Wine.
+          for i := 0 to EditedConfigFiles.Count - 1 do
+            RemoveBOM(EditedConfigFiles[i]);
         end else
         begin
           // Write d3d8 DLL override for Wine/Linux. For more information, see https://wiki.winehq.org/Wine_User%27s_Guide#DLL_Overrides
@@ -204,9 +199,11 @@ begin
 
     if PageId = DgVoodooPage.ID then
     begin
-      RefreshRateError := 'Refresh rate must be a valid number between 30 and 3840. If you don''t know how to find your monitor''s refresh rate, look it up on the internet.' + #13#10#13#10 + 'Keep in mind that the DxWrapper option does not require you to set a refresh rate manually.'
+      RefreshRateError := 'Refresh rate must be a valid number between 30 and 3840. If you don''t know how to find your monitor''s refresh rate, look it up on the internet.'
+        + #13#10#13#10 + 'Keep in mind that the DxWrapper option does not require you to set a refresh rate manually.'
 
       // dgVoodoo options page refresh rate validation
+      // Checks if the input is a valid number between 30 and 3840
       if (StrToInt(DgVoodooRefreshRate.Text) < 30) or (StrToInt(DgVoodooRefreshRate.Text) > 3840) then
         begin
           MsgBox(RefreshRateError, mbError, MB_OK);
@@ -214,6 +211,7 @@ begin
           Exit;
         end;
 
+      // Checks if the input consists entirely of digits
       for i := 1 to Length(DgVoodooRefreshRate.Text) do
       begin
         if not IsDigit(DgVoodooRefreshRate.Text[i]) then
@@ -225,7 +223,16 @@ begin
       end;
     end;
 
-    // If they specify an offline file in the cmd line. Check it's valid, if not don't let them continue.
+    // If the user has selected the "do not pause on Alt-Tab" option, ask them if they want the game audio to continue playing in the background too.
+    if (PageId = PageMiscOptions.ID) and (DoNotPauseOnAltTab.Checked) then
+    begin
+      MusicInBackground := MsgBox(
+        'Freelancer will continue running in the background when Alt-Tabbed. Would you also like the game''s audio to continue playing in the background?' + #13#10 + #13#10 + 
+        'You may not want this if you''re planning to run multiple instances of Freelancer simultaneously.',
+        mbConfirmation, MB_YESNO) = IDYES
+    end;
+
+    // If they specify an offline file in the cmd line. Check if it's valid, if not don't let them continue.
     # if !AllInOneInstall
     if ((PageId = 1) and (OfflineInstall <> 'false') and (not FileExists(OfflineInstall) or (Pos('.7z',OfflineInstall) < 1))) then begin
       MsgBox('The specified source file either doesn''t exist or is not a valid .7z file', mbError, MB_OK);
@@ -241,7 +248,7 @@ begin
     end;
     // Validate install location
     if (PageId = 6) then begin
-      // Need needs to be in a seperate if since it tries to expand {app} even if not on PageID 6. Pascal what are you doing!
+      // Needs to be in a seperate if statement since it tries to expand {app} even if not on PageID 6. Pascal what are you doing!
       if(Pos(AddBackslash(DataDirPage.Values[0]),ExpandConstant('{app}')) > 0) then begin
         MsgBox('Freelancer: HD Edition cannot be installed to the same location as your vanilla install. Please select a new location.', mbError, MB_OK);
         Result := False;
@@ -260,8 +267,8 @@ begin
       for i:= 0 to mirrors.Count - 1 do
       begin
         DownloadPage.Clear;
-        DownloadPage.Add(mirrors[i], 'freelancerhd.7z', '');
-        DownloadPage.SetText('Downloading mod','');
+        DownloadPage.Add(mirrors[i], MyZipName + '.7z', '');
+        DownloadPage.SetText('Downloading mod', '');
         DownloadPage.Show;
         DownloadPage.ProgressBar.Style := npbstNormal;
         try
@@ -304,6 +311,10 @@ begin
 
     // Gets the user's desktop resolution for later use
     DesktopRes := Resolution();
+
+    // Initialize EditedConfigFiles
+    EditedConfigFiles := TStringList.Create;
+    EditedConfigFiles.Sorted := true;
 
     // Initialize UI. This populates all our ui elements with text, size and other properties
     InitializeUi();

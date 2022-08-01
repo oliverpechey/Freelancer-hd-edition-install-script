@@ -82,11 +82,16 @@ begin
   end;
 end;
 
+// Used to store the names of all edited config files
+var
+  EditedConfigFiles: TStringList;
+
 // Used to replace strings in files. This replaces FLMM functions
 function FileReplaceString(const FileName, SearchString, ReplaceString: string):boolean;
 var
   MyFile : TStrings;
   MyText : string;
+  Index : Integer;
 begin
   MyFile := TStringList.Create;
 
@@ -102,6 +107,10 @@ begin
       begin;
         MyFile.Text := MyText;
         MyFile.SaveToFile(FileName);
+
+        // Keep track of all config files that have been edited
+        if not EditedConfigFiles.Find(FileName, Index) then
+          EditedConfigFiles.Add(FileName);
       end;
     except
       result := false;
@@ -126,6 +135,9 @@ begin
   try
     DC := GetDC(0);
     Result := GetDeviceCaps(DC, 116); // 116 = VREFRESH
+
+    if Result = 0 then
+      RaiseException('Refresh Rate cannot be 0.');
   except
     Result := 60
   end;
@@ -164,6 +176,12 @@ end;
 function IsDesktopRes16By9(): Boolean;
 begin
   Result := Trunc(Single(DesktopRes.Width) / DesktopRes.Height * 100.0) / 100.0 = 1.77
+end;
+
+// Whether or not the desktop resolution has an aspect ratio of 4:3
+function IsDesktopRes4By3(): Boolean;
+begin
+  Result := Trunc(Single(DesktopRes.Width) / DesktopRes.Height * 100.0) / 100.0 = 1.33
 end;
 
 // Converts an int to hex

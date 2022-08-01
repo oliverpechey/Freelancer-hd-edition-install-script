@@ -32,14 +32,19 @@ var
   EnglishImprovements: TCheckBox;
   descEnglishImprovements: TNewStaticText;
 
+  // Russian fonts
+  lblRussianFonts: TLabel;
+  RussianFonts: TCheckBox;
+  descRussianFonts: TNewStaticText;
+
   // Single Player mode
-  lblStoryMode: TLabel;
-  lblOspNormal: TLabel;
-  lblOspPirate: TLabel;
-  StoryMode: TRadioButton;
-  OspNormal: TRadioButton;
-  OspPirate: TRadioButton;
+  StoryMode: TComboBox;
   descSinglePlayerMode: TNewStaticText;
+
+  // Level requirements
+  lblLevelRequirements: TLabel;
+  LevelRequirements: TCheckBox;
+  descLevelRequirements: TNewStaticText;
 
   // New save folder
   lblNewSaveFolder: TLabel;
@@ -187,6 +192,7 @@ var
   // Do not pause on alt tab
   lblDoNotPauseOnAltTab: TLabel;
   DoNotPauseOnAltTab: TCheckBox;
+  MusicInBackground: Boolean;
 
 // Report on download progress
 # if !AllInOneInstall
@@ -292,7 +298,7 @@ begin
 
   // Initialize English Improvements page and add content
   PageEnglishImprovements := CreateCustomPage(CallSign.ID,
-  'Localization', 'Apply English improvements');
+  'Localization', 'Apply English improvements and other fixes');
 
   lblEnglishImprovements := TLabel.Create(PageEnglishImprovements);
   lblEnglishImprovements.Parent := PageEnglishImprovements.Surface;
@@ -306,57 +312,74 @@ begin
   descEnglishImprovements.Width := PageEnglishImprovements.SurfaceWidth;
   descEnglishImprovements.Caption := 
   'This option fixes many typos, grammar mistakes, inconsistencies, and more, in the English Freelancer text and audio resources. It also adds a higher quality Freelancer intro (1440x960 instead of 720x480), which is only available in English.' + #13#10#13#10 +  
-  'NOTE: This option will set all of Freelancer''s text, a few voice lines, and the intro to English. Disable this option if you''d like to play Freelancer in a different language like German, French, or Russian.';
+  'NOTE: This option will set all of Freelancer''s text, a few voice lines, and the intro to English. Disable this option if you''d like to play Freelancer in a different language like German, French, or Russian.'  + #13#10#13#10 +
+  'NOTE 2: If this option is disabled, several ship control option names from the settings menu will be blank.';
 
   EnglishImprovements := TCheckBox.Create(PageEnglishImprovements);
   EnglishImprovements.Parent := PageEnglishImprovements.Surface;
   EnglishImprovements.Checked := True;
 
+  lblRussianFonts := TLabel.Create(PageEnglishImprovements);
+  lblRussianFonts.Parent := PageEnglishImprovements.Surface;
+  lblRussianFonts.Caption := 'Use Russian fonts';
+  lblRussianFonts.Left := ScaleX(20);
+  lblRussianFonts.Top := descEnglishImprovements.Top + ScaleY(160);
+  
+  descRussianFonts := TNewStaticText.Create(PageEnglishImprovements);
+  descRussianFonts.Parent := PageEnglishImprovements.Surface;
+  descRussianFonts.WordWrap := True;
+  descRussianFonts.Top := descEnglishImprovements.Top + ScaleY(180);
+  descRussianFonts.Width := PageEnglishImprovements.SurfaceWidth;
+  descRussianFonts.Caption := 'This option will use a Cyrillic version of the Agency FB font for Freelancer. Users with a Russian Freelancer installation may want to enable this.';
+
+  RussianFonts := TCheckBox.Create(PageEnglishImprovements);
+  RussianFonts.Parent := PageEnglishImprovements.Surface;
+  RussianFonts.Top := lblRussianFonts.Top;
+
+
   // Initialize Single Player page and add content
   PageSinglePlayer := CreateCustomPage(PageEnglishImprovements.ID, 
   'Single Player options', 'Choose how you''d like to play Single Player');
 
-  lblStoryMode := TLabel.Create(PageSinglePlayer);
-  lblStoryMode.Parent := PageSinglePlayer.Surface;
-  lblStoryMode.Caption := 'Story Mode (default)';
-  lblStoryMode.Left := ScaleX(20);
-  
-  StoryMode := TRadioButton.Create(PageSinglePlayer);
+  StoryMode := TComboBox.Create(PageSinglePlayer);
   StoryMode.Parent := PageSinglePlayer.Surface;
-  StoryMode.Checked := True;
-  
-  lblOspNormal := TLabel.Create(PageSinglePlayer);
-  lblOspNormal.Parent := PageSinglePlayer.Surface;
-  lblOspNormal.Caption := 'Open Single Player (Normal)';
-  lblOspNormal.Left := ScaleX(20);
-  lblOspNormal.Top := ScaleY(20);
-  
-  OspNormal := TRadioButton.Create(PageSinglePlayer);
-  OspNormal.Parent := PageSinglePlayer.Surface;
-  OspNormal.Top := ScaleY(20);
-  
-  lblOspPirate := TLabel.Create(PageSinglePlayer);
-  lblOspPirate.Parent := PageSinglePlayer.Surface;
-  lblOspPirate.Caption := 'Open Single Player (Pirate)';
-  lblOspPirate.Left := ScaleX(20);
-  lblOspPirate.Top := OspNormal.Top + ScaleY(20);
-  
-  OspPirate := TRadioButton.Create(PageSinglePlayer);
-  OspPirate.Parent := PageSinglePlayer.Surface;
-  OspPirate.Top := lblOspPirate.Top;
+  StoryMode.Style := csDropDownList;
+  StoryMode.Width := 180;
+  StoryMode.Items.Add('Story Mode (default)');
+  StoryMode.Items.Add('Open Single Player (Normal)');
+  StoryMode.Items.Add('Open Single Player (Pirate)');
+  StoryMode.ItemIndex := 0;
   
   descSinglePlayerMode := TNewStaticText.Create(PageSinglePlayer);
   descSinglePlayerMode.Parent := PageSinglePlayer.Surface;
   descSinglePlayerMode.WordWrap := True;
   descSinglePlayerMode.Width := PageSinglePlayer.SurfaceWidth;
   descSinglePlayerMode.Caption := 'This option allows you to choose the Single Player mode. Story Mode simply lets you play through the entire storyline, as usual. Both Open Single Player options skip the entire storyline and allow you to freely roam the universe right away. With OSP (Normal), you start in Manhattan with a basic loadout and a default reputation. The OSP (Pirate) option on the other hand, spawns you at Rochester with a similar loadout and an inverted reputation. NOTE: Both OSP options may cause existing storyline saves to not work correctly.';
-  descSinglePlayerMode.Top := OspPirate.Top + ScaleY(20);
+  descSinglePlayerMode.Top := ScaleY(25);
   
+  // Level requirements
+  lblLevelRequirements := TLabel.Create(PageSinglePlayer);
+  lblLevelRequirements.Parent := PageSinglePlayer.Surface;
+  lblLevelRequirements.Caption := 'Remove level requirements';
+  lblLevelRequirements.Left := ScaleX(20);
+  lblLevelRequirements.Top := descSinglePlayerMode.Top + ScaleY(108);
+
+  LevelRequirements := TCheckBox.Create(PageWidescreenHud);
+  LevelRequirements.Parent := PageSinglePlayer.Surface;
+  LevelRequirements.Top := lblLevelRequirements.Top;
+  
+  descLevelRequirements := TNewStaticText.Create(PageSinglePlayer);
+  descLevelRequirements.Parent := PageSinglePlayer.Surface;
+  descLevelRequirements.WordWrap := True;
+  descLevelRequirements.Top := LevelRequirements.Top + ScaleY(20);
+  descLevelRequirements.Width := PageSinglePlayer.SurfaceWidth;
+  descLevelRequirements.Caption := 'This option removes the level requirements for ships and equipment in Single Player.';
+
   // Add new missile effects
   lblNewSaveFolder := TLabel.Create(PageSinglePlayer);
   lblNewSaveFolder.Parent := PageSinglePlayer.Surface;
   lblNewSaveFolder.Caption := 'Store save game files in a different folder';
-  lblNewSaveFolder.Top := descSinglePlayerMode.Top + ScaleY(110);
+  lblNewSaveFolder.Top := descLevelRequirements.Top + ScaleY(30);
   lblNewSaveFolder.Left := ScaleX(20);
   
   descNewSaveFolder := TNewStaticText.Create(PageSinglePlayer);
@@ -388,7 +411,7 @@ begin
   StartupRes.Add('4K 4:3 - 2880x2160');
   StartupRes.Add('4K 16:9 - 3840x2160');
 
-  // Determine best default startup resolution
+  // Determine best default startup resolution based on user's screen size
   if (DesktopRes.Height >= 2160) then 
     StartupRes.Values[8] := True
   else if (DesktopRes.Height >= 1440) then
@@ -399,7 +422,7 @@ begin
   // Initialize LogoRes page and add content
   LogoRes := CreateInputOptionPage(StartupRes.ID,
   'Freelancer Logo Resolution', 'In the game''s main menu',
-  'This logo has a resolution of 800x600 by default, which makes it look stretched and pixelated/blurry on HD 16:9 monitors. ' +
+  'The main menu Freelancer logo has a resolution of 800x600 by default, which makes it look stretched and pixelated/blurry on HD widescreen monitors. ' +
   'Setting this to a higher resolution with the correct aspect ratio makes the logo look nice and sharp and not stretched-out. Hence we recommend setting this option to your monitor''s native resolution. ' +
   'Please note that a higher resolution option may negatively impact the game''s start-up speed.',
   True, False);
@@ -414,7 +437,7 @@ begin
   LogoRes.Add('4K 4:3 - 2880x2160');
   LogoRes.Add('4K 16:9 - 3840x2160');
 
-  // Determine best default logo resolution
+  // Determine best default logo resolution based on user's screen size
   if (DesktopRes.Height >= 2160) then 
     LogoRes.Values[9] := True
   else if (DesktopRes.Height >= 1440) then
@@ -432,7 +455,7 @@ begin
   SmallText.Add('Yes, apply fix for 2560x1440 screens');
   SmallText.Add('Yes, apply fix for 3840x2160 screens');
 
-  // Determine best small text fix
+  // Determine best small text fix based on user's screen size
   if (DesktopRes.Height >= 2160) then 
     SmallText.Values[2] := True
   else if (DesktopRes.Height >= 1440) then
@@ -457,18 +480,20 @@ begin
   descWidescreenHud.WordWrap := True;
   descWidescreenHud.Top := ScaleY(20);
   descWidescreenHud.Width := PageWidescreenHud.SurfaceWidth;
-  descWidescreenHud.Caption := 'This option adds two new useful widgets to your HUD. Next to your contact list, you will have a wireframe representation of your selected target. Next to your weapons list, you will have a wireframe of your own ship. Disable this option if you play in 4:3.' + #13#10 + #13#10 +
-  'If you choose to enable this option, go to the Controls settings in-game and under "User Interface", disable Target View (Alt + T). This key binding has become obsolete as both the target view and contact list are visible simultaneously.';
+  descWidescreenHud.Caption := 'This option adds two new useful widgets to your HUD. Next to your contact list, you will have a wireframe representation of your selected target. Next to your weapons list, you will have a wireframe of your own ship. Disable this option if you play in 4:3.';
   
   WidescreenHud := TCheckBox.Create(PageWidescreenHud);
   WidescreenHud.Parent := PageWidescreenHud.Surface;
-  WidescreenHud.Checked := True;
+
+  // Only check the wide screen HUD option if the user's aspect ratio is not 4:3
+  if (not IsDesktopRes4By3()) then
+    WidescreenHud.Checked := True;
 
   lblWeaponGroups := TLabel.Create(PageWidescreenHud);
   lblWeaponGroups.Parent := PageWidescreenHud.Surface;
   lblWeaponGroups.Caption := 'Add Weapon Group buttons';
   lblWeaponGroups.Left := ScaleX(20);
-  lblWeaponGroups.Top := descWidescreenHud.Top + ScaleY(120);
+  lblWeaponGroups.Top := descWidescreenHud.Top + ScaleY(65);
   
   descWeaponGroups := TNewStaticText.Create(PageWidescreenHud);
   descWeaponGroups.Parent := PageWidescreenHud.Surface;
@@ -564,7 +589,7 @@ begin
   descGraphicsApi.Parent := PageGraphicsApi.Surface;
   descGraphicsApi.WordWrap := True;
   descGraphicsApi.Width := PageGraphicsApi.SurfaceWidth;
-  descGraphicsApi.Caption := 'This page allows you to choose the graphics API. If you have no idea what this means, just go with either the first or second option, since those offer additional graphics enhancements. If they are causing issues for you, go with the 3rd or 4th option.';
+  descGraphicsApi.Caption := 'This page allows you to choose the graphics API. If you have no idea what this means, just go with the first option, since it offer additional graphics enhancements and fixes. If it''s causing issues for you, go with the 2nd, 3rd, or 4th option.';
 
   lblDgVoodooGraphicsApi := TLabel.Create(PageGraphicsApi);
   lblDgVoodooGraphicsApi.Parent := PageGraphicsApi.Surface;
@@ -586,7 +611,7 @@ begin
 
   lblDxWrapperGraphicsApi := TLabel.Create(PageGraphicsApi);
   lblDxWrapperGraphicsApi.Parent := PageGraphicsApi.Surface;
-  lblDxWrapperGraphicsApi.Caption := 'DxWrapper + d3d8to9 (DirectX 9, recommended)';
+  lblDxWrapperGraphicsApi.Caption := 'DxWrapper + d3d8to9 (DirectX 9)';
   lblDxWrapperGraphicsApi.Left := ScaleX(20);
   lblDxWrapperGraphicsApi.Top := descDgVoodooGraphicsApi.Top + ScaleY(40);
 
@@ -599,7 +624,7 @@ begin
   descDxWrapperGraphicsApi.WordWrap := True;
   descDxWrapperGraphicsApi.Top := DxWrapperGraphicsApi.Top + ScaleY(15);
   descDxWrapperGraphicsApi.Width := PageGraphicsApi.SurfaceWidth;
-  descDxWrapperGraphicsApi.Caption := 'Supports native Anti-Aliasing, Anisotropic Filtering, and ReShade.';
+  descDxWrapperGraphicsApi.Caption := 'Supports native Anti-Aliasing, Anisotropic Filtering, and ReShade. Not 100% stable.';
 
   lblVanillaGraphicsApi := TLabel.Create(PageGraphicsApi);
   lblVanillaGraphicsApi.Parent := PageGraphicsApi.Surface;
@@ -1125,18 +1150,26 @@ begin
   DisplayMode := TComboBox.Create(PageMiscOptions);
   DisplayMode.Parent := PageMiscOptions.Surface;
   DisplayMode.Style := csDropDownList;
-  DisplayMode.Width := 200;
+  DisplayMode.Width := 210;
   DisplayMode.Items.Add('Fullscreen (default, recommended)');
   DisplayMode.Items.Add('Windowed');
   DisplayMode.Items.Add('Borderless Windowed');
   DisplayMode.ItemIndex := 0;
   DisplayMode.Top := BestOptions.Top + ScaleY(80);
 
+  // Make Borderless Windowed the recommended and selected option on Wine to fix the Alt-Tab bug
+  if IsWine then
+  begin
+    DisplayMode.Items[0] := 'Fullscreen (default)';
+    DisplayMode.Items[2] := 'Borderless Windowed (recommended)';
+    DisplayMode.ItemIndex := 2;
+  end;
+
   lblDisplayMode := TLabel.Create(PageMiscOptions);
   lblDisplayMode.Parent := PageMiscOptions.Surface;
   lblDisplayMode.Caption := 'Display Mode';
   lblDisplayMode.Top := DisplayMode.Top;
-  lblDisplayMode.Left := ScaleX(210);
+  lblDisplayMode.Left := ScaleX(220);
 
   descDisplayMode := TNewStaticText.Create(PageMiscOptions);
   descDisplayMode.Parent := PageMiscOptions.Surface;
@@ -1154,6 +1187,7 @@ begin
   DoNotPauseOnAltTab := TCheckBox.Create(PageMiscOptions);
   DoNotPauseOnAltTab.Parent := PageMiscOptions.Surface;
   DoNotPauseOnAltTab.Top := lblDoNotPauseOnAltTab.Top;
+  MusicInBackground := False;
 
   with DxWrapperPage do
   begin
@@ -1185,13 +1219,14 @@ begin
     OnClick := @DgVoodooReShadeCheckBoxClick;
   end;
 
-  // Make all the custom checkboxes and radio buttons less wide so the clickable area doesn't hide the accompanying labels.
-  if (IsWine) then
+  // Make all the custom checkboxes and radio buttons less wide so the clickable area doesn't hide the accompanying labels on Wine.
+  if IsWine then
   begin
     CheckBoxWidth := ScaleX(20)
 
     // Checkboxes
     EnglishImprovements.Width := CheckBoxWidth
+    LevelRequirements.Width := CheckBoxWidth
     NewSaveFolder.Width := CheckBoxWidth
     WidescreenHud.Width := CheckBoxWidth
     WeaponGroups.Width := CheckBoxWidth
@@ -1214,9 +1249,6 @@ begin
     DoNotPauseOnAltTab.Width := CheckBoxWidth
 
     // Radio buttons
-    StoryMode.Width := CheckBoxWidth
-    OspNormal.Width := CheckBoxWidth
-    OspPirate.Width := CheckBoxWidth
     DxWrapperGraphicsApi.Width := CheckBoxWidth
     DgVoodooGraphicsApi.Width := CheckBoxWidth
     VanillaGraphicsApi.Width := CheckBoxWidth
